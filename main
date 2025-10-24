@@ -1,0 +1,145 @@
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+import re
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+import nltk
+import requests
+from bs4 import BeautifulSoup
+
+
+# Downloads NLTK's stopwords list for English
+nltk.download('stopwords')
+
+
+# Function to fetch news content from a given link
+def fetch_news_content_from_link(link):
+    try:
+        response = requests.get(link)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        paragraphs = soup.find_all('p')
+        # Extract text from all paragraphs
+        news_content = ' '.join([para.get_text() for para in paragraphs])
+        return news_content
+    except Exception as e:
+        print(f"Error fetching content from link: {e}")
+        return ""
+
+
+# Function for stemming and preprocessing
+def stemming(text):
+    port_stem = PorterStemmer()
+    # Keep only letters, convert to lowercase, split into words
+    stemmed_content = re.sub('[^a-zA-Z]', ' ', text.lower()).split()
+    # Stemming and remove stopwords
+    stemmed_content = [port_stem.stem(word) for word in stemmed_content if not word in stopwords.words('english')]
+    # Join the words back into a single string
+    stemmed_content = ' '.join(stemmed_content)
+    return stemmed_content
+
+
+# Assuming you have your dataset ready
+# X and Y are the features and labels
+# For demonstration, let's create some dummy data
+X = ["This is a real news", "This is a fake news", "More real news content", "Another fake news"]
+Y = [0, 1, 0, 1]
+
+
+# Vectorize the text data
+vectorizer = TfidfVectorizer()
+X_tfidf = vectorizer.fit_transform(X)
+
+
+# Split the data into training and test sets
+X_train, X_test, Y_train, Y_test = train_test_split(X_tfidf, Y, test_size=0.25, random_state=42)
+
+
+# Train a simple logistic regression model
+model = LogisticRegression()
+model.fit(X_train, Y_train)
+
+
+# Predict on the test set
+X_test_prediction = model.predict(X_test)
+
+
+# Evaluate model performance on the test set
+try:
+    precision = precision_score(Y_test, X_test_prediction, zero_division=1)
+    recall = recall_score(Y_test, X_test_prediction, zero_division=1)
+    f1 = f1_score(Y_test, X_test_prediction, zero_division=1)
+    accuracy = accuracy_score(Y_test, X_test_prediction)
+except Exception as e:
+    print(f"Exception occurred during metric calculation: {str(e)}")
+    precision = 0.0
+    recall = 0.0
+    f1 = 0.0
+    accuracy = 0.0
+
+
+print("Initial Model Metrics on Test Set:")
+print(f'Precision: {precision:.2f}')
+print(f'Recall: {recall:.2f}')
+print(f'F1 Score: {f1:.2f}')
+print(f'Accuracy: {accuracy:.2f}')
+
+
+# Start loop for user input
+while True:
+    # User input for the link
+    link = input("Enter the news article link (or type 'exit' to stop): ")
+    if link.lower() == 'exit':
+        break
+
+
+    new_content = fetch_news_content_from_link(link)
+
+
+    if new_content:
+        # Preprocess the fetched content
+        preprocessed_content = stemming(new_content)
+        new_content_tfidf = vectorizer.transform([preprocessed_content])
+
+
+        # Make predictions using the previous model
+        new_prediction = model.predict(new_content_tfidf)
+        print("\nPrediction on New Content:")
+        print("Fetched Content:", new_content)
+        print("Predicted Label:", new_prediction[0])
+        if new_prediction[0] == 0:
+            print('Prediction Result: The news is Real')
+        else:
+            print('Prediction Result: The news is Fake')
+
+
+        # Calculate accuracy, precision, recall, and F1 score for the new prediction
+        try:
+            accuracy_new = accuracy_score([0], new_prediction)  # Assuming we know the true label is 0 for real news
+            precision_new = precision_score([0], new_prediction, zero_division=1)
+            recall_new = recall_score([0], new_prediction, zero_division=1)
+            f1_new = f1_score([0], new_prediction, zero_division=1)
+        except Exception as e:
+            print(f"Exception occurred during metric calculation: {str(e)}")
+            accuracy_new = 0.0
+            precision_new = 0.0
+            recall_new = 0.0
+            f1_new = 0.0
+
+
+        print("\nMetrics on New Content Prediction:")
+        print(f'Precision: {precision_new:.2f}')
+        print(f'Recall: {recall_new:.2f}')
+        print(f'F1 Score: {f1_new:.2f}')
+        print(f'Accuracy: {accuracy_new:.2f}')
+    else:
+        print("Failed to fetch news content from the provided link.")
+
+
+print("\nFinal Model Metrics on Test Set:")
+print(f'Precision: {precision:.2f}')
+print(f'Recall: {recall:.2f}')
+print(f'F1 Score: {f1:.2f}')
+print(f'Accuracy: {accuracy:.2f}')
